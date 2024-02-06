@@ -3,142 +3,104 @@ import java.util.*;
 import java.io.*;
 
 init with{:
-    table = new HashMap<String, HashMap<String, Double>>();
+    table = new HashMap<String, HashMap<String, Object[]>>();
 :};
 
 parser code{:
-    public HashMap<String, HashMap<String, Double>> table;
+    public HashMap<String, HashMap<String, Object[]>> table;
 
-    public void report_error(String message, Object info){
-        StringBuffer m = new StringBuffer(message);
-        if (info instanceof Symbol){
-            if(((Symbol)info).left != 1 && ((Symbol)info).right != 1){
-                if(((Symbol)info).left != -1 && ((Symbol)info).right != -1){
-                    int line = (((Symbol)info).left) + 1;
-                    int column = (((Symbol)info).right) + 1;
-                    m.append("(line" + line + "column " + column + ")");
-                }
-            }
-            System.err.println(m);
-        }
-    }
-
-     // Return semantic value of symbol in position (position)
     public Object stack(int position) {
         return (((Symbol)stack.elementAt(tos+position)).value);
     }
-
 :};
 
-terminal SEP, TK1, TK2, TK3, S, QSTRING, MINUS, UINT, REAL, EURO, CM, PERC;
-// terminal String;
-// terminal Integer;
-// terminal Double;
-non terminal prog, purchase, dress_cat, header, header1, header2, header3, header4, header5, header_opt1, header_opt2, shopping_sec, dresses_sec;
-non terminal HashMap prod_list, purchased_prods;
-non terminal Object[] prod;
-// non terminal Double;
+/////////////////////////////
+//// Symbols Delaration
+////////////////////////////
 
-// precedence left PLUS,MINUS;
-// precedence left STAR,DIV;
+terminal TK1, TK2, TK3, S, SEP, CCL, EUR, CM, COL;
+terminal String QSTRING, ID;
+terminal Double REAL;
+terminal Integer UINT;
+
+non terminal prog, header, h1, cpus, device;
+non terminal HashMap cpu_list;
+non terminal Double multiplier, prod, purchases;
+
+/////////////////////////////
+//// Header
+////////////////////////////
+
 start with prog;
 
-prog ::= header SEP dresses_sec SEP shopping_sec;
-
-header ::= header_opt1 | header_opt2;
-
-header_opt1 ::= header2 | header3 | header4;
-
-//FIRST CASE
-
-header1 ::= TK1 S TK1 S TK1 S | header1 TK1 S TK1 S;
-
-header2 ::= header1 TK2 S TK2 S TK2 S;
-
-header3 ::= header2 TK2 S TK2 S TK2 S TK2 S TK2 S TK2 S;
-
-header4 ::= header3 TK2 S;
-
-// SECOND CASE
-
-header_opt2 ::= TK2 S header5 TK2 S header5;
-
-header5 ::= | header5 TK1 S | header5 TK3 S;
-
-
-// DRESSES SECTION
-
-dresses_sec ::= dress_cat S dress_cat S dress_cat S | dresses_sec dress_cat S dress_cat S;
-
-dress_cat ::= QSTRING:cat_name MINUS prod_list:products{:
-HashMap<String, Double> tmp = products;
-parser.table.put((String)cat_name, tmp);
+prog ::= header SEP cpus SEP purchases:tot{:
+    System.out.println("AGGREGATE_TOTAL: " + tot);
 :};
 
-prod_list ::= prod:x CM{:
-    String prod_name = (String)x[0];
-    Double prod_vale = (Double)x[1];
-    HashMap<String, Double> products = new HashMap<String, Double>();
-    products.put(prod_name, prod_vale);
-    RESULT = products;
-:} 
-| prod_list:products prod:x CM{:
-    String prod_name = (String)x[0];
-    Double prod_vale = (Double)x[1];
-    products.put(prod_name, prod_vale);
-    RESULT = products;
-:} 
-| prod_list:products prod:x{:
-    String prod_name = (String)x[0];
-    Double prod_vale = (Double)x[1];
-    products.put(prod_name, prod_vale);
-    RESULT = products;
+header ::= h1 TK1 S h1 | h1 TK1 S h1 TK1 S h1 | h1 TK1 S h1 TK1 S h1 TK1 S h1;
+h1 ::= | h1 TK2 S | h1 TK3 S;
+
+/////////////////////////////
+//// CPUS Section
+////////////////////////////
+
+cpus ::= device S device S device S | cpus device S device S;
+
+device ::= QSTRING:n CCL cpu_list:c{:
+    parser.table.put(n, c);
 :};
 
-prod ::= UINT QSTRING:name REAL:cost EURO{:
-    RESULT = new Object[2];
-    RESULT[0] = (String)name;
-    RESULT[1] = (Double)cost;
+cpu_list ::= | cpu_list:c ID:id QSTRING:n REAL:x EUR{:
+        HashMap<String, Object[]> components = new HashMap<String, Object[]>();
+        Object[] ins = new Object[2];
+        ins[0] = n;
+        ins[1] = x;
+        components.put(id, ins);
+        RESULT = components;
+:} | cpu_list:c CM ID:id QSTRING:n REAL:x EUR{:
+        Object[] ins = new Object[2];
+        ins[0] = n;
+        ins[1] = x;
+        c.put(id, ins);
+        RESULT = c;
 :};
 
-// SHOPPING SECTION  
+/////////////////////////////
+//// P Section
+////////////////////////////
 
-shopping_sec ::= purchase S | shopping_sec purchase S;
-
-purchase ::= QSTRING:cat_name UINT:sale PERC MINUS purchased_prods:purchased_prods{:
-    Double total = new Double(0);
-    Integer total_qty = 0;
-    System.out.println(cat_name);
-    HashMap<String, Double> products = parser.table.get((String)cat_name);
-    HashMap<String, Integer> pp = (HashMap<String, Integer>)purchased_prods;
-    Set<String> keys = pp.keySet();
-    for(String name: keys) {
-        Integer quantity = pp.get(name);
-        Double cost = products.get(name);
-        Double db_sale = ((Integer)sale).doubleValue();
-        Double final_price = cost * quantity * db_sale / 100;
-        total += final_price;
-        total_qty += quantity;
-        System.out.println(name + " " + final_price + " euro");
-    }
-    System.out.println("TOTAL: " + total + " euro N_PROD: " + total_qty);
+purchases ::= QSTRING COL multiplier COL prod:tot S{:
+    System.out.println("TOTAL: " + tot);
+    System.out.println("***");
+    RESULT = tot;
+:} | purchases:prev QSTRING COL multiplier COL prod:tot S{:
+    System.out.println("TOTAL: " + tot);
+    RESULT = tot + prev;
 :};
 
-purchased_prods ::= QSTRING:name UINT:qty CM{:
-    HashMap<String, Integer> purchased_prods = new HashMap<String, Integer>();
-    purchased_prods.put((String)name, (Integer)qty);
-    RESULT = purchased_prods;
+prod ::= ID:id UINT:y{:
+    String device = (String)parser.stack(-5);
+    Double multiplier = (Double)parser.stack(-3);
+    HashMap<String, Object[]> components = parser.table.get(device);
+    String name = (String)components.get(id)[0];
+    Double price = (Double)components.get(id)[1];
+    Double total = price * y * multiplier;
+    System.out.println(name + " " + total);
+    RESULT = total;
 :} 
-| QSTRING:name UINT:qty{:
-    HashMap<String, Integer> purchased_prods = new HashMap<String, Integer>();
-    purchased_prods.put((String)name, (Integer)qty);
-    RESULT = purchased_prods;
-:}
-| purchased_prods:purchased_prods QSTRING:name UINT:qty CM{:
-    purchased_prods.put((String)name, (Integer)qty);
-    RESULT = purchased_prods;
-:} 
-| purchased_prods:purchased_prods QSTRING:name UINT:qty{:
-    purchased_prods.put((String)name, (Integer)qty);
-    RESULT = purchased_prods;
+| prod:tot CM ID:id UINT:y{:
+    String device = (String)parser.stack(-7);
+    Double multiplier = (Double)parser.stack(-5);
+    HashMap<String, Object[]> components = parser.table.get(device);
+    String name = (String)components.get(id)[0];
+    Double price = (Double)components.get(id)[1];
+    Double total = price * y * multiplier;
+    System.out.println(name + " " + total);
+    RESULT = tot + total;
+:};
+
+multiplier ::= {:
+    RESULT = new Double(1);
+:}| REAL:x {:
+    RESULT = x;
 :};
